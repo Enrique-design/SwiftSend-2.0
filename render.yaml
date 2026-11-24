@@ -1,0 +1,58 @@
+
+databases:
+  - name: swiftsend-db
+    plan: free
+    databaseName: swiftsend
+    user: swiftsend
+
+services:
+  - type: web
+    name: swiftsend-couriers
+    runtime: python
+    plan: free
+    buildCommand: "bash build.sh"
+    startCommand: "gunicorn dmts.wsgi:application --bind 0.0.0.0:$PORT"
+    healthCheckPath: /
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "0"
+
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
+
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+
+      - key: DB_ENGINE
+        value: "postgresql"
+
+      - key: DB_NAME
+        fromDatabase:
+          name: swiftsend-db
+          property: database
+
+      - key: DB_USER
+        fromDatabase:
+          name: swiftsend-db
+          property: user
+
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: swiftsend-db
+          property: password
+
+      - key: DB_HOST
+        fromDatabase:
+          name: swiftsend-db
+          property: host
+
+      - key: DB_PORT
+        fromDatabase:
+          name: swiftsend-db
+          property: port
+
+      - key: SECURE_HSTS_SECONDS
+        value: "0"

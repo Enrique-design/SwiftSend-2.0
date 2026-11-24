@@ -4,3 +4,4 @@ Pillow>=11,<12
 psycopg[binary]>=3.2,<4
 # Optional production ASGI/WSGI server; Django's runserver is for local development.
 gunicorn>=23,<24; platform_system != "Windows"
+whitenoise>=6.9,<7

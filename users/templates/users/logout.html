@@ -1,0 +1,1 @@
+{% extends 'users/base.html' %}{% block title %}Signed out{% endblock %}{% block auth_content %}<div class="container py-5 text-center"><h2>You have signed out.</h2><a class="btn btn-primary mt-3" href="{% url 'users:login' %}">Sign in again</a></div>{% endblock %}

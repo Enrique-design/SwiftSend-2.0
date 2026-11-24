@@ -1,0 +1,220 @@
+
+{% extends 'users/base.html' %}
+{% block title %}Live fleet map{% endblock %}
+{% block eyebrow %}OPERATIONS / FLEET VISIBILITY{% endblock %}
+{% block page_title %}Live fleet map{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+    <p>See drivers who have enabled location sharing and sent a recent GPS update. The map refreshes automatically.</p>
+    <span class="map-refresh"><span class="live-dot"></span> Refreshing every 15 seconds</span>
+</div>
+
+<div class="map-layout">
+    <section class="panel map-panel">
+        <div id="fleet-map" class="map-canvas"></div>
+        <div class="map-attribution-note">
+            Map tiles © OpenStreetMap contributors · Driver location depends on device GPS.
+        </div>
+    </section>
+
+    <aside class="panel location-list-panel">
+        <div class="panel-heading">
+            <div>
+                <div class="eyebrow">LIVE DRIVERS</div>
+                <h3>On the network</h3>
+            </div>
+            <span id="driver-count" class="subtle-count">0 ONLINE</span>
+        </div>
+
+        <div id="driver-locations" class="driver-location-list">
+            <div class="empty-inline">
+                <i class="bi bi-broadcast"></i>
+                <strong>Waiting for GPS updates</strong>
+                <small>Drivers appear when they opt in to location sharing.</small>
+            </div>
+        </div>
+
+        <div class="map-legend">
+            <span><i class="legend-dot"></i> Sharing location</span>
+            <span><i class="legend-dot muted-dot"></i> Not visible / stale</span>
+        </div>
+    </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+(() => {
+    const map = L.map('fleet-map').setView([-33.9249, 18.4241], 11);
+
+    // Use OpenStreetMap directly. No CARTO API key required.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const markers = new Map();
+    const list = document.getElementById('driver-locations');
+    const count = document.getElementById('driver-count');
+
+    function popupNode(item) {
+        const box = document.createElement('div');
+
+        const title = document.createElement('strong');
+        title.textContent = item.driver || 'Driver';
+        box.appendChild(title);
+
+        const job = document.createElement('div');
+        job.textContent = item.delivery_code || '';
+        box.appendChild(job);
+
+        if (item.dropoff) {
+            const destination = document.createElement('small');
+            destination.textContent = 'Destination: ' + item.dropoff;
+            box.appendChild(destination);
+        }
+
+        return box;
+    }
+
+    async function refresh() {
+        try {
+            const response = await fetch(
+                '{% url "deliveries:api_live_locations" %}',
+                { headers: { 'Accept': 'application/json' } }
+            );
+
+            if (!response.ok) {
+                throw new Error('Unable to load live locations');
+            }
+
+            const data = await response.json();
+            const locations = data.locations || [];
+
+            count.textContent = locations.length + ' ONLINE';
+
+            const present = new Set();
+            const validCoordinates = [];
+
+            locations.forEach(item => {
+                if (item.latitude == null || item.longitude == null) return;
+
+                const key = item.driver;
+                present.add(key);
+
+                validCoordinates.push([
+                    item.latitude,
+                    item.longitude
+                ]);
+
+                let marker = markers.get(key);
+
+                if (!marker) {
+                    marker = L.marker([
+                        item.latitude,
+                        item.longitude
+                    ]).addTo(map);
+
+                    markers.set(key, marker);
+                } else {
+                    marker.setLatLng([
+                        item.latitude,
+                        item.longitude
+                    ]);
+                }
+
+                marker.bindPopup(popupNode(item));
+            });
+
+            markers.forEach((marker, key) => {
+                if (!present.has(key)) {
+                    map.removeLayer(marker);
+                    markers.delete(key);
+                }
+            });
+
+            if (validCoordinates.length && !window.hasFitFleet) {
+                map.fitBounds(validCoordinates, {
+                    padding: [35, 35],
+                    maxZoom: 13
+                });
+
+                window.hasFitFleet = true;
+            }
+
+            list.innerHTML = '';
+
+            if (!locations.length) {
+                list.innerHTML = `
+                    <div class="empty-inline">
+                        <i class="bi bi-broadcast"></i>
+                        <strong>No drivers sharing location</strong>
+                        <small>When a driver starts GPS sharing, their latest position will appear here.</small>
+                    </div>`;
+                return;
+            }
+
+            locations.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'driver-location-row';
+
+                const avatar = document.createElement('span');
+                avatar.className = 'avatar';
+                avatar.textContent = (item.driver || '?').slice(0, 1).toUpperCase();
+
+                const details = document.createElement('div');
+                details.className = 'driver-location-meta';
+
+                const name = document.createElement('strong');
+                name.textContent = item.driver || 'Driver';
+
+                const job = document.createElement('small');
+                job.textContent = item.delivery_code || '';
+
+                const updated = document.createElement('small');
+                updated.textContent = item.updated_at
+                    ? 'GPS updated ' + new Date(item.updated_at).toLocaleTimeString()
+                    : 'Waiting for GPS';
+
+                details.append(name, job, updated);
+
+                const focus = document.createElement('button');
+                focus.className = 'icon-btn';
+                focus.title = 'Focus driver on map';
+                focus.innerHTML = '<i class="bi bi-crosshair"></i>';
+
+                focus.addEventListener('click', () => {
+                    if (item.latitude != null && item.longitude != null) {
+                        map.setView([
+                            item.latitude,
+                            item.longitude
+                        ], 15);
+                    }
+                });
+
+                row.append(avatar, details, focus);
+                list.appendChild(row);
+            });
+
+        } catch (error) {
+            list.innerHTML = `
+                <div class="empty-inline">
+                    <i class="bi bi-wifi-off"></i>
+                    <strong>Live feed unavailable</strong>
+                    <small>${error.message}</small>
+                </div>`;
+        }
+    }
+
+    refresh();
+    setInterval(refresh, 15000);
+})();
+</script>
+{% endblock %}

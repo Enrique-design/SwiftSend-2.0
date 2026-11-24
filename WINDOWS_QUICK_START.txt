@@ -1,0 +1,25 @@
+SWIFTSEND 2.0 — WINDOWS QUICK START
+
+1. Extract this folder somewhere separate from your existing DMTS_V2 project.
+2. Open the extracted SwiftSend_2_0 folder in VS Code.
+3. Open a PowerShell terminal in that folder.
+4. Run these commands one at a time:
+
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install --upgrade pip
+   python -m pip install -r requirements.txt
+   python manage.py migrate
+   python manage.py check
+   python manage.py makemigrations --check --dry-run
+   python manage.py test
+   python manage.py runserver
+
+5. Open http://127.0.0.1:8000/ in your browser.
+
+IMPORTANT: Make a backup of db.sqlite3 before running migrations. The included database is a copy of the database supplied in your audit ZIP. Your original project folder is not changed.
+
+If you want a fresh database instead, move the included db.sqlite3 to a safe backup location before running migrate, then create an admin account with:
+   python manage.py createsuperuser
+
+This package is a development upgrade, not a production deployment. Read SWIFTSEND_2_0_UPGRADE_NOTES.md before deployment.

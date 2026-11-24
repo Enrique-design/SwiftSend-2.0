@@ -1,0 +1,87 @@
+{% extends 'users/base.html' %}
+{% block title %}Driver workspace{% endblock %}
+{% block eyebrow %}DRIVER WORKSPACE / MY ROUTE{% endblock %}
+{% block page_title %}Your delivery route{% endblock %}
+{% block content %}
+<div class="driver-welcome"><div><span class="welcome-kicker">DRIVER PORTAL</span><h2>Ready for the road, {{ user.first_name|default:user.username }}?</h2><p>Your assigned jobs, delivery actions and live location controls are here.</p></div><div class="driver-illustration"><i class="bi bi-truck-front-fill"></i><span class="driver-illustration-pin"><i class="bi bi-geo-alt-fill"></i></span></div></div>
+<div class="stats-grid driver-stats"><div class="stat-card"><div class="stat-top"><span>Assigned jobs</span><span class="stat-icon purple"><i class="bi bi-box-seam"></i></span></div><div class="stat-value">{{ total_assigned }}</div><div class="stat-foot">All jobs assigned to you</div></div><div class="stat-card"><div class="stat-top"><span>Active route</span><span class="stat-icon blue"><i class="bi bi-truck"></i></span></div><div class="stat-value">{{ active_deliveries.count }}</div><div class="stat-foot">Jobs still in progress</div></div><div class="stat-card"><div class="stat-top"><span>Completed today</span><span class="stat-icon green"><i class="bi bi-check-circle"></i></span></div><div class="stat-value">{{ completed_today }}</div><div class="stat-foot">Successful deliveries</div></div></div>
+<section class="panel location-control"><div class="location-control-icon"><i class="bi bi-crosshair"></i></div><div class="location-control-copy"><strong>Live location sharing</strong><p id="location-message">{% if location.is_sharing %}Sharing is enabled on your account. Resume GPS updates when you are ready.{% else %}Your location is private until you switch sharing on. Sharing helps dispatch and customers track active deliveries.{% endif %}</p><small>GPS is used only with your permission. You can stop sharing at any time.</small></div><div class="location-control-action"><span id="sharing-pill" class="sharing-pill {% if location.is_sharing %}sharing-on{% endif %}"><i class="bi bi-circle-fill"></i><span id="sharing-text">{% if location.is_sharing %}Enabled{% else %}Off{% endif %}</span></span><button id="location-toggle" class="btn {% if location.is_sharing %}btn-outline-primary{% else %}btn-primary{% endif %}" type="button" data-enabled="{% if location.is_sharing %}resume{% else %}false{% endif %}">{% if location.is_sharing %}Resume GPS{% else %}Start sharing{% endif %}</button></div></section>
+<div id="gps-warning" class="alert alert-warning d-none mt-3"></div>
+<div class="panel-heading standalone-heading"><div><div class="eyebrow">TODAY'S WORK</div><h3>Your assigned deliveries</h3></div><span class="subtle-count">{{ active_deliveries.count }} ACTIVE</span></div>
+<div class="driver-jobs">
+{% for item in deliveries %}
+  <article class="panel job-card" id="delivery-{{ item.pk }}">
+    <div class="job-head"><div><span class="table-id">DMTS-{{ item.pk }}</span><span class="priority priority-{{ item.priority }} ms-2">{{ item.get_priority_display }}</span><h3>{{ item.customer_name }}</h3><p>{{ item.customer_phone|default:'No contact number provided' }}</p></div><span class="status status-{{ item.status }}">{{ item.get_status_display }}</span></div>
+    <div class="job-route"><div class="job-route-point"><span class="route-marker pickup"></span><div><small>COLLECT FROM</small><strong>{{ item.pickup_address }}</strong></div></div><div class="job-route-point"><span class="route-marker dropoff"></span><div><small>DELIVER TO</small><strong>{{ item.dropoff_address }}</strong></div></div></div>
+    <div class="job-meta"><span><i class="bi bi-calendar-event"></i> {% if item.scheduled_for %}{{ item.scheduled_for|date:'d M · H:i' }}{% else %}No scheduled time{% endif %}</span><span><i class="bi bi-truck"></i> {{ item.assigned_vehicle.registration_number|default:'No vehicle allocated' }}</span></div>
+    {% if item.special_instructions %}<div class="driver-instructions"><i class="bi bi-info-circle"></i><div><strong>Instructions</strong><p>{{ item.special_instructions }}</p></div></div>{% endif %}
+    {% if item.status == 'assigned' %}<div class="job-actions"><form method="post" action="{% url 'deliveries:update_delivery_status' item.pk %}">{% csrf_token %}<input type="hidden" name="status" value="picked_up"><button class="btn btn-primary"><i class="bi bi-box-arrow-in-down me-2"></i>Confirm pickup</button></form><form method="post" action="{% url 'deliveries:update_delivery_status' item.pk %}">{% csrf_token %}<input type="hidden" name="status" value="in_transit"><button class="btn btn-outline-primary">Start route <i class="bi bi-arrow-right ms-2"></i></button></form></div>
+    {% elif item.status == 'picked_up' %}<div class="job-actions"><form method="post" action="{% url 'deliveries:update_delivery_status' item.pk %}">{% csrf_token %}<input type="hidden" name="status" value="in_transit"><button class="btn btn-primary"><i class="bi bi-truck me-2"></i>Start route</button></form></div>
+    {% elif item.status == 'in_transit' %}<div class="completion-form"><h4><i class="bi bi-check2-circle me-2"></i>Complete delivery</h4><form method="post" enctype="multipart/form-data" action="{% url 'deliveries:update_delivery_status' item.pk %}">{% csrf_token %}<input type="hidden" name="status" value="delivered"><div class="form-grid two-col"><div class="field-wrap"><label class="form-label">Received by <span class="required-star">*</span></label><input class="form-control" name="recipient_name" placeholder="Full name" required></div><div class="field-wrap"><label class="form-label">Proof photo (optional)</label><input class="form-control" type="file" name="proof_photo" accept="image/*"><small class="form-hint">Maximum 5 MB</small></div><div class="field-wrap span-2"><label class="form-label">Delivery notes</label><input class="form-control" name="delivery_notes" placeholder="Optional note about handover"></div></div><div class="job-actions"><button class="btn btn-primary"><i class="bi bi-check-lg me-2"></i>Mark delivered</button></div></form></div>
+    {% elif item.status == 'failed' %}<div class="failed-box"><strong><i class="bi bi-exclamation-triangle me-2"></i>Last attempt failed</strong><p>{{ item.failed_reason|default:'No reason recorded' }}</p><div class="job-actions"><form method="post" action="{% url 'deliveries:update_delivery_status' item.pk %}">{% csrf_token %}<input type="hidden" name="status" value="assigned"><button class="btn btn-outline-primary">Retry delivery</button></form><form method="post" action="{% url 'deliveries:update_delivery_status' item.pk %}">{% csrf_token %}<input type="hidden" name="status" value="returned"><button class="btn btn-light">Return to depot</button></form></div></div>
+    {% elif item.status == 'delivered' %}<div class="job-complete"><i class="bi bi-check-circle-fill"></i> Delivered{% if item.delivered_at %} · {{ item.delivered_at|date:'d M Y, H:i' }}{% endif %}{% if item.recipient_name %} · Received by {{ item.recipient_name }}{% endif %}</div>
+    {% elif item.status == 'returned' or item.status == 'cancelled' %}<div class="job-complete muted">This delivery is closed.</div>{% endif %}
+    {% if item.status == 'assigned' or item.status == 'picked_up' or item.status == 'in_transit' %}<details class="exception-details"><summary><i class="bi bi-exclamation-triangle me-2"></i>Report a delivery issue</summary><form method="post" action="{% url 'deliveries:update_delivery_status' item.pk %}">{% csrf_token %}<input type="hidden" name="status" value="failed"><div class="field-wrap"><label class="form-label">Reason for failed attempt</label><input class="form-control" name="failed_reason" placeholder="e.g. Recipient unavailable, address incorrect" required></div><button class="btn btn-outline-danger btn-sm mt-2">Submit failed attempt</button></form></details>{% endif %}
+  </article>
+{% empty %}<div class="panel empty-state"><i class="bi bi-clipboard-check"></i><strong>No jobs assigned</strong><span>New jobs will appear here when dispatch assigns them to you.</span></div>{% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const button = document.getElementById('location-toggle');
+  if (!button) return;
+  const message = document.getElementById('location-message');
+  const warning = document.getElementById('gps-warning');
+  const pill = document.getElementById('sharing-pill');
+  const pillText = document.getElementById('sharing-text');
+  let watchId = null, heartbeat = null;
+  const csrf = document.cookie.split('; ').find(x => x.startsWith('csrftoken='))?.split('=')[1] || '';
+  async function post(url, body, json=false) {
+    const response = await fetch(url, {method:'POST', headers:{'X-CSRFToken':csrf, ...(json?{'Content-Type':'application/json'}:{'Content-Type':'application/x-www-form-urlencoded'})}, body:json?JSON.stringify(body):new URLSearchParams(body)});
+    const data = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(data.message || 'Request failed');
+    return data;
+  }
+  async function sendPosition(position) {
+    try {
+      await post('{% url "deliveries:update_driver_location" %}', {
+        latitude:position.coords.latitude, longitude:position.coords.longitude,
+        accuracy:position.coords.accuracy, speed:position.coords.speed, heading:position.coords.heading
+      }, true);
+      message.textContent = 'GPS connected. Your latest position is being shared with dispatch for active jobs.';
+      warning.classList.add('d-none');
+    } catch (error) { warning.textContent = error.message; warning.classList.remove('d-none'); }
+  }
+  function startGps() {
+    if (!('geolocation' in navigator)) { warning.textContent='This browser does not support GPS location.'; warning.classList.remove('d-none'); return; }
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = navigator.geolocation.watchPosition(sendPosition, error => {
+      const reasons = {1:'Location permission was denied. Allow location access in your browser settings.',2:'Your location is currently unavailable. Move to an area with a clearer GPS signal.',3:'GPS timed out. Try again.'};
+      warning.textContent = reasons[error.code] || 'Unable to read your location.'; warning.classList.remove('d-none');
+    }, {enableHighAccuracy:true, maximumAge:5000, timeout:20000});
+    if (heartbeat) clearInterval(heartbeat);
+    heartbeat = setInterval(() => { navigator.geolocation.getCurrentPosition(sendPosition, error => { warning.textContent='GPS update unavailable. Your last location will become stale if no new position arrives.'; warning.classList.remove('d-none'); }, {enableHighAccuracy:true, maximumAge:5000, timeout:15000}); }, 15000);
+    button.textContent = 'Stop sharing'; button.className='btn btn-outline-danger'; button.dataset.enabled='active';
+    pill.classList.add('sharing-on'); pillText.textContent='Sharing';
+  }
+  async function stopGps() {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId=null;
+    if (heartbeat) clearInterval(heartbeat); heartbeat=null;
+    await post('{% url "deliveries:toggle_location_sharing" %}', {enabled:'false'});
+    button.textContent='Start sharing'; button.className='btn btn-primary'; button.dataset.enabled='false';
+    pill.classList.remove('sharing-on'); pillText.textContent='Off';
+    message.textContent='Location sharing is off. Your position is no longer being sent.';
+  }
+  button.addEventListener('click', async () => {
+    button.disabled=true;
+    try {
+      if (button.dataset.enabled === 'active') { await stopGps(); }
+      else { await post('{% url "deliveries:toggle_location_sharing" %}', {enabled:'true'}); startGps(); }
+    } catch(error) { warning.textContent=error.message; warning.classList.remove('d-none'); }
+    finally { button.disabled=false; }
+  });
+  window.addEventListener('pagehide', () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId); if (heartbeat) clearInterval(heartbeat); });
+})();
+</script>
+{% endblock %}

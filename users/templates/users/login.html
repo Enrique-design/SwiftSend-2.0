@@ -1,0 +1,20 @@
+{% extends 'users/base.html' %}
+{% block title %}Sign in{% endblock %}
+{% block auth_content %}
+<div class="login-page">
+  <div class="login-story">
+    <div class="login-brand"><span class="brand-mark"><i class="bi bi-box-seam-fill"></i></span><span><strong>SwiftSend</strong><small>DELIVERY OPERATIONS</small></span><span class="version-pill">2.0</span></div>
+    <div class="story-content"><span class="story-tag"><i class="bi bi-activity"></i> OPERATIONS, CONNECTED</span><h1>Every delivery.<br><em>Under control.</em></h1><p>One workspace for dispatch, driver operations, live tracking and proof of delivery.</p><div class="story-stats"><div><strong>01</strong><small>Dispatch</small></div><div><strong>02</strong><small>Track</small></div><div><strong>03</strong><small>Deliver</small></div></div></div>
+    <div class="story-foot">DELIVERY MANAGEMENT SYSTEM · VERSION 2.0</div>
+  </div>
+  <div class="login-panel"><div class="login-form-wrap"><div class="eyebrow">WELCOME BACK</div><h2>Sign in to your workspace</h2><p class="muted">Enter your account details to continue.</p>
+    <form method="post" class="mt-4">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      <label class="form-label">Username</label><div class="input-with-icon"><i class="bi bi-person"></i><input type="text" name="username" autocomplete="username" class="form-control" placeholder="Your username" required autofocus></div>
+      <label class="form-label mt-3">Password</label><div class="input-with-icon"><i class="bi bi-lock"></i><input type="password" name="password" autocomplete="current-password" class="form-control" placeholder="Your password" required></div>
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="btn btn-primary w-100 mt-4 py-3" type="submit">Sign in <i class="bi bi-arrow-right ms-2"></i></button>
+    </form><div class="login-note"><i class="bi bi-shield-lock"></i> Protected operations access. Contact your system administrator if you need an account.</div>
+  </div><div class="login-copyright">© {% now "Y" %} SwiftSend Operations</div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,6 @@
+Django>=5.2,<5.3
+Pillow>=11,<12
+# Optional production database driver (only needed when DB_ENGINE=postgresql)
+psycopg[binary]>=3.2,<4
+# Optional production ASGI/WSGI server; Django's runserver is for local development.
+gunicorn>=23,<24; platform_system != "Windows"
